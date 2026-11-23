@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoboLearn 3D Engineering Console</title>
+<style>
+:root{--bg:#12141a;--head:#0e1015;--panel:#1b1e27;--panel2:#242836;--line:#2c3142;--text:#e8eaf0;--mute:#98a0b3;--accent:#22b8cf;--btn:#5b5bf0;--btnon:#8a8aff;--stop:#ef4444;--nub:#6366f1}
+:root[data-theme=light]{--bg:#eef0f6;--head:#fff;--panel:#fff;--panel2:#e8ebf3;--line:#d3d8e5;--text:#1a1d29;--mute:#586076;--accent:#0b8da1;--btnon:#3d3dd6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--head);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:20px;font-weight:700;color:var(--accent)}
+h2{margin:0 0 12px;font-size:15px;font-weight:700}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.stick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#theme{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
+main{display:grid;grid-template-columns:270px minmax(0,1fr) 300px;gap:20px;padding:20px 24px;max-width:1500px;margin:0 auto}
+aside,.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn{background:var(--btn);color:#fff;border:0;border-radius:8px;padding:14px 4px;font-weight:600;font-size:13px;touch-action:none;user-select:none}
+.btn.on{background:var(--btnon);box-shadow:inset 0 0 0 2px #fff6}
+.btn.stop{background:var(--stop)}
+#fwd{grid-column:2}#left{grid-row:2}#reset{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}#back{grid-column:2;grid-row:3}
+.sticks{display:flex;justify-content:space-around;margin:26px 0 20px}
+.sticks figure{margin:0;text-align:center}
+.sticks figcaption{font-size:13px;margin-top:8px}
+.sticks small{display:block;color:var(--mute);font-size:12px}
+.stick{width:100px;height:100px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);position:relative;touch-action:none;margin:0 auto}
+.nub{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:var(--nub);pointer-events:none}
+.mode{text-align:center;background:var(--panel2);border-radius:10px;padding:14px}
+#knob{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);background:var(--panel);margin:10px auto;position:relative;transition:transform .2s}
+#knob::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:18px;margin-left:-2px;border-radius:2px;background:var(--accent)}
+.labels{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+.labels button{background:none;border:0;padding:2px 6px;border-radius:4px}
+.labels .on{background:var(--accent);color:#fff;font-weight:600}
+.stage{position:relative;aspect-ratio:16/10;background:#000;border-radius:12px;overflow:hidden}
+#unity{width:100%;height:100%;display:block}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--panel);padding:24px;text-align:center}
+.track{width:60%;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+#bar{height:100%;width:0;background:var(--accent)}
+#overlay.err{color:var(--stop)}
+#full{position:absolute;right:10px;bottom:10px;background:var(--accent);border:0;border-radius:6px;padding:6px 10px;color:#fff;display:none}
+.row{display:flex;justify-content:space-between;padding:5px 0}
+.row span:first-child{color:var(--mute)}
+.row span:last-child{font-variant-numeric:tabular-nums}
+#t-mode{color:var(--accent);font-weight:600}
+.docs{margin-top:20px}
+.docs p,.docs li{color:var(--mute);font-size:14px}
+.docs ul{padding-left:18px;margin:8px 0}
+kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+@media(max-width:1000px){main{grid-template-columns:1fr}.stage{order:-1}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RoboLearn 3D Engineering Console</h1>
+  <button id="theme" type="button">Light mode</button>
+</header>
+
+<main>
+  <aside>
+    <h2>Hardware Key Matrix</h2>
+    <div class="keys">
+      <button class="btn" id="fwd" data-hold="FORWARD">FORWARD</button>
+      <button class="btn" id="left" data-hold="TURN_LEFT">TURN LEFT</button>
+      <button class="btn stop" id="reset" type="button">RESET</button>
+      <button class="btn" id="right" data-hold="TURN_RIGHT">TURN RIGHT</button>
+      <button class="btn" id="back" data-hold="BACK">HW BACK</button>
+    </div>
+
+    <div class="sticks">
+      <figure>
+        <div class="stick" id="s1" tabindex="0" aria-label="Stick 1, climb and yaw"><div class="nub"></div></div>
+        <figcaption>Stick 1<small>Climb and yaw</small></figcaption>
+      </figure>
+      <figure>
+        <div class="stick" id="s2" tabindex="0" aria-label="Stick 2, pitch and roll"><div class="nub"></div></div>
+        <figcaption>Stick 2<small>Pitch and roll</small></figcaption>
+      </figure>
+    </div>
+
+    <div class="mode">
+      <h2>Behavior Mode</h2>
+      <div id="knob" role="img" aria-label="Mode knob"></div>
+      <div class="labels" id="labels">
+        <button type="button">Manual</button><button type="button">Maze</button><button type="button">Line</button>
+      </div>
+    </div>
+  </aside>
+
+  <section>
+    <div class="stage">
+      <canvas id="unity" tabindex="-1"></canvas>
+      <div id="overlay"><div id="msg">Loading drone simulator</div><div class="track"><div id="bar"></div></div></div>
+      <button id="full" type="button">Fullscreen</button>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card" style="padding:0;border:0;background:none">
+      <h2>Flight Telemetry</h2>
+      <div class="row"><span>Active Mode</span><span id="t-mode">Waiting</span></div>
+      <div class="row"><span>Pitch</span><span id="t-pitch">0.0°</span></div>
+      <div class="row"><span>Roll</span><span id="t-roll">0.0°</span></div>
+      <div class="row"><span>Gyro Heading</span><span id="t-head">0°</span></div>
+      <div class="row"><span>Height</span><span id="t-height">0.00 m</span></div>
+    </div>
+    <div class="docs">
+      <h2>Control Documentation</h2>
+      <p>Fly with the on-screen controls or the keyboard.</p>
+      <ul>
+        <li>Stick 1: up and down climbs, left and right yaws.</li>
+        <li>Stick 2: up and down pitches, left and right rolls.</li>
+        <li>When all controls are released, the estimated flight model levels out and descends at 0.5 m/s.</li>
+        <li>Keyboard: click the drone view first, then use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, <kbd>Space</kbd> and <kbd>Shift</kbd> for climb and descend, <kbd>Q</kbd> and <kbd>E</kbd> to yaw.</li>
+        <li>Maze and Line are placeholders. They stop manual input until an autopilot is added.</li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<script>
+// ---- Settings: change these if your build or object names differ ----
+const BUILD = 'Build/WebGLAPP1';   // loader/data/framework/wasm share this prefix
+const BRIDGE = 'DroneBridge';      // GameObject name in the Unity scene
+const IDLE_DESCENT_RATE = 0.5;
+
+const $ = s => document.querySelector(s);
+let unity = null;
+const flight = { pitch: 0, roll: 0, heading: 0, height: 0, last: performance.now() };
+const sticks = { stick1: { x: 0, y: 0 }, stick2: { x: 0, y: 0 } };
+const buttonSources = new Map();
+let hasUnityTelemetry = false;
+
+function send(method, value) {
+  if (!unity) return;
+  if (value === undefined) unity.SendMessage(BRIDGE, method);
+  else unity.SendMessage(BRIDGE, method, value);
+}
+
+function setButtonInput(name, source, active) {
+  const sources = buttonSources.get(name) || new Set();
+  const wasActive = sources.size > 0;
+  if (active) sources.add(source);
+  else sources.delete(source);
+  const isActive = sources.size > 0;
+  if (isActive) buttonSources.set(name, sources);
+  else buttonSources.delete(name);
+  if (wasActive !== isActive) send('SetButton', name + ',' + (isActive ? '1' : '0'));
+}
+
+// ---- Theme ----
+const root = document.documentElement;
+function setTheme(t) {
+  root.dataset.theme = t;
+  $('#theme').textContent = t === 'dark' ? 'Light mode' : 'Dark mode';
+  try { localStorage.setItem('rl-theme', t); } catch (e) {}
+}
+try { setTheme(localStorage.getItem('rl-theme') || 'dark'); } catch (e) {}
+$('#theme').onclick = () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+
+// ---- Hold buttons ----
+document.querySelectorAll('[data-hold]').forEach(el => {
+  const name = el.dataset.hold;
+  const off = () => { el.classList.remove('on'); setButtonInput(name, el, false); };
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('on');
+    setButtonInput(name, el, true);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, off));
+});
+$('#reset').onclick = () => {
+  send('ResetDrone');
+  Object.assign(flight, { pitch: 0, roll: 0, heading: 0, height: 0 });
+};
+
+const keyCommands = {
+  KeyW: 'FORWARD', KeyS: 'BACK', KeyA: 'TURN_LEFT', KeyD: 'TURN_RIGHT',
+  KeyQ: 'TURN_LEFT', KeyE: 'TURN_RIGHT', Space: 'CLIMB',
+  ShiftLeft: 'DESCEND', ShiftRight: 'DESCEND'
+};
+window.addEventListener('keydown', e => {
+  const command = keyCommands[e.code];
+  if (!command || e.repeat) return;
+  e.preventDefault();
+  setButtonInput(command, e.code, true);
+});
+window.addEventListener('keyup', e => {
+  const command = keyCommands[e.code];
+  if (command) setButtonInput(command, e.code, false);
+});
+
+// ---- Joysticks (x, y in -1..1, up = +y, spring back to centre) ----
+function stick(el, method) {
+  const nub = el.querySelector('.nub');
+  let id = null;
+  const reach = () => el.clientWidth / 2 - nub.clientWidth / 2;
+  const set = (x, y) => {
+    nub.style.transform = `translate(${x * reach()}px, ${-y * reach()}px)`;
+    const state = method === 'SetStick1' ? sticks.stick1 : sticks.stick2;
+    state.x = x;
+    state.y = y;
+    send(method, x.toFixed(3) + ',' + y.toFixed(3));
+  };
+  const move = e => {
+    const r = el.getBoundingClientRect();
+    let x = (e.clientX - r.left - r.width / 2) / reach();
+    let y = -(e.clientY - r.top - r.height / 2) / reach();
+    const m = Math.hypot(x, y);
+    if (m > 1) { x /= m; y /= m; }
+    set(x, y);
+  };
+  el.addEventListener('pointerdown', e => { id = e.pointerId; el.setPointerCapture(id); move(e); });
+  el.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
+  const end = e => { if (e.pointerId === id) { id = null; set(0, 0); } };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+stick($('#s1'), 'SetStick1');
+stick($('#s2'), 'SetStick2');
+
+// ---- Behavior mode knob ----
+const modes = ['Manual', 'Maze', 'Line'];
+const labels = [...document.querySelectorAll('#labels button')];
+function setMode(i) {
+  $('#knob').style.transform = `rotate(${(i - 1) * 60}deg)`;
+  labels.forEach((b, k) => b.classList.toggle('on', k === i));
+  send('SetMode', modes[i]);
+  setMode.current = i;
+  $('#t-mode').textContent = modes[i] + (hasUnityTelemetry ? '' : ' (estimated)');
+}
+labels.forEach((b, i) => b.onclick = () => setMode(i));
+$('#knob').onclick = () => setMode(((setMode.current || 0) + 1) % 3);
+setMode(0);
+
+// ---- Telemetry from Unity, with a control-input estimate when unavailable ----
+function renderTelemetry(mode, values, estimated) {
+  $('#t-mode').textContent = mode + (estimated ? ' (estimated)' : '');
+  $('#t-pitch').textContent = values.pitch.toFixed(1) + '°';
+  $('#t-roll').textContent = values.roll.toFixed(1) + '°';
+  $('#t-head').textContent = Math.round(values.heading) + '°';
+  $('#t-height').textContent = values.height.toFixed(2) + ' m';
+}
+
+window.onUnityTelemetry = json => {
+  let t;
+  try { t = JSON.parse(json); } catch (e) { return; }
+  const values = { pitch: Number(t.pitch), roll: Number(t.roll), heading: Number(t.heading), height: Number(t.height) };
+  if (Object.values(values).some(value => !Number.isFinite(value))) return;
+  hasUnityTelemetry = true;
+  renderTelemetry(t.mode || modes[setMode.current || 0], values, false);
+};
+
+setInterval(() => {
+  const now = performance.now();
+  const dt = Math.min((now - flight.last) / 1000, 0.1);
+  flight.last = now;
+  if (hasUnityTelemetry) return;
+
+  const down = name => buttonSources.has(name);
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const forward = Number(down('FORWARD')) - Number(down('BACK'));
+  const turn = Number(down('TURN_RIGHT')) - Number(down('TURN_LEFT'));
+  const targetPitch = clamp(sticks.stick2.y * 24 + forward * 18, -35, 35);
+  const targetRoll = clamp(sticks.stick2.x * 24, -35, 35);
+  const smoothing = 1 - Math.exp(-7 * dt);
+  flight.pitch += (targetPitch - flight.pitch) * smoothing;
+  flight.roll += (targetRoll - flight.roll) * smoothing;
+  flight.heading = (flight.heading + (sticks.stick1.x * 90 + turn * 75) * dt + 360) % 360;
+  const climb = sticks.stick1.y * 1.5 + Number(down('CLIMB')) - Number(down('DESCEND'));
+  const active = Math.hypot(sticks.stick1.x, sticks.stick1.y, sticks.stick2.x, sticks.stick2.y) > 0.05 ||
+    ['FORWARD', 'BACK', 'TURN_LEFT', 'TURN_RIGHT', 'CLIMB', 'DESCEND'].some(down);
+  const verticalSpeed = climb || (active ? 0 : -IDLE_DESCENT_RATE);
+  flight.height = Math.max(0, flight.height + verticalSpeed * dt);
+  renderTelemetry(modes[setMode.current || 0], flight, true);
+}, 50);
+
+// ---- Load the Unity build ----
+function fail(text) {
+  const o = $('#overlay');
+  o.classList.add('err');
+  o.innerHTML = '<div>' + text + '</div>';
+}
+const s = document.createElement('script');
+if (location.protocol === 'file:') {
+  fail('This Unity WebGL build must be opened from a local web server, not directly as a file. In VS Code, right-click drone-console.html and choose "Open with Live Server", then use the URL it opens.');
+} else {
+s.src = BUILD + '.loader.js';
+s.onerror = () => fail('Could not load ' + BUILD + '.loader.js. Serve this page over http (for example Live Server) from the folder that contains Build/, and check the BUILD name at the top of the script.');
+s.onload = () => {
+  createUnityInstance($('#unity'), {
+    dataUrl: BUILD + '.data',
+    frameworkUrl: BUILD + '.framework.js',
+    codeUrl: BUILD + '.wasm',
+    streamingAssetsUrl: 'StreamingAssets',
+    companyName: 'DefaultCompany',
+    productName: 'WebGLAPP1',
+    productVersion: '1.0'
+  }, p => { $('#bar').style.width = (p * 100) + '%'; })
+  .then(u => {
+    unity = u;
+    $('#overlay').style.display = 'none';
+    $('#full').style.display = 'block';
+    $('#full').onclick = () => unity.SetFullscreen(1);
+    setMode(setMode.current || 0);
+  })
+  .catch(e => fail('Unity failed to start: ' + e));
+};
+document.body.appendChild(s);
+}
+</script>
+</body>
+</html>

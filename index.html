@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity Web Player | WebglApp</title>
+    <link rel="shortcut icon" href="../TemplateData/favicon.ico">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-theme="dark">
+
+    <header>
+        <h1>RoboLearn 3D Engineering Console</h1>
+        <div class="header-actions">
+            <button id="theme-toggle" onclick="toggleTheme()">Light Mode</button>
+            <div class="badge">Unity Core Active</div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        
+        <!-- PANEL 1: LEFT SIDE CONTROLS -->
+        <div class="panel panel-left-controls">
+            <div class="control-top-section">
+                <h3>Hardware Key Matrix</h3>
+                <div class="btn-grid">
+                    <div></div>
+                    <button class="action-btn" onclick="moveForward()">FORWARD</button>
+                    <div></div>
+                    
+                    <button class="action-btn" onclick="turnLeft()">TURN LEFT</button>
+                    <button class="reset-btn" onclick="resetRobot()">RESET</button>
+                    <button class="action-btn" onclick="turnRight()">TURN RIGHT</button>
+
+                    <div></div>
+                    <button class="action-btn" onclick="executeBackAction()">HW BACK</button>
+                    <div></div>
+                </div>
+
+                <div class="dual-analog-row">
+                    <div class="analog-box">
+                        <span class="stick-label">Stick 1</span>
+                        <div class="joystick-boundary" id="joy-boundary-1">
+                            <div class="joystick-stick" id="joy-stick-1"></div>
+                        </div>
+                    </div>
+                    <div class="analog-box">
+                        <span class="stick-label">Stick 2</span>
+                        <div class="joystick-boundary" id="joy-boundary-2">
+                            <div class="joystick-stick" id="joy-stick-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-bottom-section">
+                <div class="knob-container">
+                    <h3>Behavior Mode</h3>
+                    <div class="knob-wrapper">
+                        <div id="behavior-knob" class="knob position-1">
+                            <div class="knob-indicator"></div>
+                        </div>
+                    </div>
+                    <div class="knob-labels">
+                        <span class="k-label active" onclick="setKnobMode(1)">Manual</span>
+                        <span class="k-label" onclick="setKnobMode(2)">Maze</span>
+                        <span class="k-label" onclick="setKnobMode(3)">Line</span>
+                    </div>
+                </div>
+
+                <div class="hardware-tuning-panel">
+                    <h3>Physics Calibration Matrix</h3>
+                    <div class="input-group">
+                        <label>Max Motor Velocity (RPM):</label>
+                        <input type="number" id="param-speed" min="10" max="200" value="100" onchange="updatePhysicalParams()">
+                    </div>
+                    <div class="input-group">
+                        <label>Chassis Mass (kg):</label>
+                        <input type="range" id="param-weight" min="1" max="15" value="5" step="0.5" oninput="updatePhysicalParams()">
+                        <span id="weight-val">5 kg</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL 2: CENTER ARENA (NATIVE UNITY CANVAS CONTAINED DIRECTLY IN THE ROVER SLOT) -->
+        <div class="panel panel-simulation-center">
+            <div id="unity-container" class="unity-desktop">
+              <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+              <div id="unity-loading-bar">
+                <div id="unity-logo"></div>
+                <div id="unity-progress-bar-empty">
+                  <div id="unity-progress-bar-full"></div>
+                </div>
+              </div>
+              <div id="unity-warning"> </div>
+              <div id="unity-footer">
+                <div id="unity-logo-title-footer"></div>
+                <div id="unity-fullscreen-button"></div>
+                <div id="unity-build-title">WebglApp</div>
+              </div>
+            </div>
+        </div>
+
+        <!-- PANEL 3: RIGHT PANEL DETAILED TELEMETRY -->
+        <div class="panel panel-right-instructions">
+            <h2>Control Documentation</h2>
+            <p class="panel-desc">Welcome to the execution sandbox. Use this pane to track system commands:</p>
+            
+            <div class="instruction-card">
+                <h4>1. Unity Runtime Integration</h4>
+                <p>The middle sandbox window hosts your compiled native game instance. Actions are packaged and pushed directly over to Unity.</p>
+            </div>
+
+            <div class="instruction-card">
+                <h4>2. Kinematic Control Bridge</h4>
+                <p>Ensures your parameters match incoming signals to the game engine coordinate matrices fields perfectly.</p>
+            </div>
+
+            <div class="telemetry">
+                <h3>Diagnostic Telemetry Core</h3>
+                <div class="data-row"><span>Active Mode:</span> <span id="telemetry-mode" style="color: #06b6d4;">MANUAL TELEOP</span></div>
+                <div class="data-row"><span>Left Motor:</span> <span id="telemetry-left">0 RPM</span></div>
+                <div class="data-row"><span>Right Motor:</span> <span id="telemetry-right">0 RPM</span></div>
+                <div class="data-row"><span>Pitch:</span> <span id="telemetry-pitch">0.0°</span></div>
+                <div class="data-row"><span>Roll:</span> <span id="telemetry-roll">0.0°</span></div>
+                <div class="data-row"><span>Height:</span> <span id="telemetry-height">--</span></div>
+                <div class="data-row"><span>Gyro Heading:</span> <span id="telemetry-angle">0°</span></div>
+                <p id="telemetry-source" class="telemetry-source">Motor RPM estimated from controls</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+      var windowUnityInstance = null;
+      var canvas = document.querySelector("#unity-canvas");
+
+      function unityShowBanner(msg, type) {
+        var warningBanner = document.querySelector("#unity-warning");
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/WebGLAPP1.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/WebGLAPP1.data",
+        frameworkUrl: buildUrl + "/WebGLAPP1.framework.js",
+        codeUrl: buildUrl + "/WebGLAPP1.wasm",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "WebglApp",
+        productVersion: "0.1.0",
+        showBanner: unityShowBanner,
+        errorHandler: function(err, url, line) {
+            return true;
+        }
+      };
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        document.querySelector("#unity-container").className = "unity-mobile";
+        canvas.className = "unity-mobile";
+      } else {
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+      }
+
+      document.querySelector("#unity-loading-bar").style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
+        }).then((unityInstance) => {
+          windowUnityInstance = unityInstance;
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          document.querySelector("#unity-fullscreen-button").onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
+        }).catch((message) => {
+          console.error(message);
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+    <script src="app.js?v=telemetry-2"></script>
+  </body>
+</html>
